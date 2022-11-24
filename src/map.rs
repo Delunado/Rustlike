@@ -1,4 +1,4 @@
-﻿use rltk::{RandomNumberGenerator};
+﻿use rltk::{Algorithm2D, BaseMap, Point, RandomNumberGenerator};
 use std::cmp::{max, min};
 use super::{Rect};
 
@@ -11,6 +11,7 @@ pub enum TileType {
 
 pub struct Map {
     pub tiles: Vec<TileType>,
+    pub revealed_tiles : Vec<bool>,
     pub rooms: Vec<Rect>,
     pub width: i32,
     pub height: i32,
@@ -53,6 +54,7 @@ impl Map {
     pub fn create_map() -> Map {
         let mut map = Map {
             tiles: vec![TileType::Wall; 80 * 50],
+            revealed_tiles: vec![false; 80 * 50],
             rooms: Vec::new(),
             width: 80,
             height: 50,
@@ -101,5 +103,17 @@ impl Map {
         }
 
         map
+    }
+}
+
+impl Algorithm2D for Map {
+    fn dimensions(&self) -> Point {
+        Point::new(self.width, self.height)
+    }
+}
+
+impl BaseMap for Map {
+    fn is_opaque(&self, index: usize) -> bool {
+        self.tiles[index as usize] == TileType::Wall
     }
 }

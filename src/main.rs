@@ -1,43 +1,59 @@
 mod map;
+
 pub use map::*;
 
 mod rect;
+
 pub use rect::Rect;
 
 mod player;
+
 pub use player::*;
 
 mod components;
-use components::{LeftMover, Position, Renderable, Player};
 
-use rltk::{GameState, RandomNumberGenerator, Rltk, RGB};
+mod visibility_system;
+
+pub use visibility_system::VisibilitySystem;
+
+use components::{LeftMover, Position, Renderable, Player, Viewshed};
+
+use rltk::{GameState, RandomNumberGenerator, Rltk, RGB, Point};
 use specs::prelude::*;
 
 //Map
-fn draw_map(map: &Map, ctx: &mut Rltk) {
-    let mut y = 0;
-    let mut x = 0;
+fn draw_map(ecs: &World, ctx: &mut Rltk) {
+    let mut viewsheds = ecs.write_storage::<Viewshed>();
+    let mut players = ecs.write_storage::<Player>();
+    let map = ecs.fetch::<Map>();
 
-    for tile in map.tiles.iter() {
-        match tile {
-            TileType::Floor => {
-                ctx.set(x, y, RGB::from_f32(0.5, 0.5, 0.5), RGB::from_f32(0., 0., 0.), rltk::to_cp437(' '))
+    for (_player, viewshed) in (&mut players, &mut viewsheds).join() {
+        let mut y = 0;
+        let mut x = 0;
+
+        for (index, tile) in map.tiles.iter().enumerate() {
+            if map.revealed_tiles[index] {
+                match tile {
+                    TileType::Floor => {
+                        ctx.set(x, y, RGB::from_f32(0.5, 0.5, 0.5), RGB::from_f32(0., 0., 0.), rltk::to_cp437(' '))
+                    }
+
+                    TileType::Wall => {
+                        ctx.set(x, y, RGB::from_f32(0.45, 0.45, 0.35), RGB::from_f32(0., 0., 0.), rltk::to_cp437('#'));
+                    }
+
+                    TileType::Flower => {
+                        ctx.set(x, y, RGB::from_f32(0.8, 0.2, 0.3),
+                                RGB::from_f32(0., 0., 0.), rltk::to_cp437(','));
+                    }
+                }
             }
 
-            TileType::Wall => {
-                ctx.set(x, y, RGB::from_f32(0.45, 0.45, 0.35), RGB::from_f32(0., 0., 0.), rltk::to_cp437('#'));
+            x += 1;
+            if x > map.width - 1 {
+                x = 0;
+                y += 1;
             }
-
-            TileType::Flower => {
-                ctx.set(x, y, RGB::from_f32(0.8, 0.2, 0.3),
-                        RGB::from_f32(0., 0., 0.), rltk::to_cp437(','));
-            }
-        }
-
-        x += 1;
-        if x > map.width - 1 {
-            x = 0;
-            y += 1;
         }
     }
 }
@@ -74,6 +90,10 @@ impl State {
     fn run_systems(&mut self) {
         let mut lw = LeftWalker {};
         lw.run_now(&self.ecs);
+
+        let mut vis = VisibilitySystem {};
+        vis.run_now(&self.ecs);
+
         self.ecs.maintain();
     }
 }
@@ -86,8 +106,7 @@ impl GameState for State {
 
         player_input(self, ctx);
 
-        let map = self.ecs.fetch::<Map>();
-        draw_map(&map, ctx);
+        draw_map(&self.ecs, ctx);
 
         let positions = self.ecs.read_storage::<Position>();
         let renderables = self.ecs.read_storage::<Renderable>();
@@ -113,10 +132,11 @@ fn main() -> rltk::BError {
     game_state.ecs.register::<Renderable>();
     game_state.ecs.register::<LeftMover>();
     game_state.ecs.register::<Player>();
+    game_state.ecs.register::<Viewshed>();
 
     let map = Map::create_map();
     let (player_x, player_y) = map.rooms[0].center();
-    
+
     game_state.ecs.insert(map);
 
     game_state
@@ -128,6 +148,11 @@ fn main() -> rltk::BError {
             glyph: rltk::to_cp437('☺'),
             fg: RGB::named(rltk::YELLOW),
             bg: RGB::named(rltk::BLACK),
+        })
+        .with(Viewshed {
+            visible_tiles: Vec::new(),
+            range: 8,
+            dirty : true
         })
         .build();
 
