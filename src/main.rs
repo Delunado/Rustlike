@@ -7,26 +7,40 @@ pub use rect::Rect;
 mod player;
 pub use player::*;
 
-use rltk::{FontCharType, GameState, RandomNumberGenerator, Rltk, RGB};
+mod components;
+use components::{LeftMover, Position, Renderable, Player};
+
+use rltk::{GameState, RandomNumberGenerator, Rltk, RGB};
 use specs::prelude::*;
-use specs_derive::Component;
 
-#[derive(Component)]
-struct Position {
-    x: i32,
-    y: i32,
+//Map
+fn draw_map(map: &Map, ctx: &mut Rltk) {
+    let mut y = 0;
+    let mut x = 0;
+
+    for tile in map.tiles.iter() {
+        match tile {
+            TileType::Floor => {
+                ctx.set(x, y, RGB::from_f32(0.5, 0.5, 0.5), RGB::from_f32(0., 0., 0.), rltk::to_cp437(' '))
+            }
+
+            TileType::Wall => {
+                ctx.set(x, y, RGB::from_f32(0.45, 0.45, 0.35), RGB::from_f32(0., 0., 0.), rltk::to_cp437('#'));
+            }
+
+            TileType::Flower => {
+                ctx.set(x, y, RGB::from_f32(0.8, 0.2, 0.3),
+                        RGB::from_f32(0., 0., 0.), rltk::to_cp437(','));
+            }
+        }
+
+        x += 1;
+        if x > map.width - 1 {
+            x = 0;
+            y += 1;
+        }
+    }
 }
-
-#[derive(Component)]
-struct Renderable {
-    glyph: FontCharType,
-    fg: RGB,
-    bg: RGB,
-}
-
-// Movement
-#[derive(Component)]
-struct LeftMover {}
 
 struct LeftWalker {}
 
@@ -72,7 +86,7 @@ impl GameState for State {
 
         player_input(self, ctx);
 
-        let map = self.ecs.fetch::<Vec<TileType>>();
+        let map = self.ecs.fetch::<Map>();
         draw_map(&map, ctx);
 
         let positions = self.ecs.read_storage::<Position>();
@@ -100,10 +114,10 @@ fn main() -> rltk::BError {
     game_state.ecs.register::<LeftMover>();
     game_state.ecs.register::<Player>();
 
-    let (rooms, map) = create_map();
+    let map = Map::create_map();
+    let (player_x, player_y) = map.rooms[0].center();
+    
     game_state.ecs.insert(map);
-
-    let (player_x, player_y) = rooms[0].center();
 
     game_state
         .ecs

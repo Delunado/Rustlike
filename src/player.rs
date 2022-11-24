@@ -1,23 +1,20 @@
 ﻿use rltk::{VirtualKeyCode, Rltk};
 use specs::prelude::*;
-use specs_derive::*;
-use super::{Position, TileType, get_map_position_index, State};
+use super::{components::{Position, Player}, TileType, State};
 use std::cmp::{min, max};
-
-#[derive(Component, Debug)]
-pub struct Player {}
+use crate::Map;
 
 pub fn move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
     let mut positions = ecs.write_storage::<Position>();
     let mut players = ecs.write_storage::<Player>();
-    let map = ecs.fetch::<Vec<TileType>>();
+    let map = ecs.fetch::<Map>();
 
     for (_player, pos) in (&mut players, &mut positions).join() {
-        let destination_index = get_map_position_index(pos.x + delta_x, pos.y + delta_y);
+        let destination_index = map.get_map_position_index(pos.x + delta_x, pos.y + delta_y);
 
-        if map[destination_index] != TileType::Wall {
-            pos.x = min(79, max(0, pos.x + delta_x));
-            pos.y = min(49, max(0, pos.y + delta_y));
+        if map.tiles[destination_index] != TileType::Wall {
+            pos.x = min(map.width - 1, max(0, pos.x + delta_x));
+            pos.y = min(map.height - 1, max(0, pos.y + delta_y));
         }
     }
 }
