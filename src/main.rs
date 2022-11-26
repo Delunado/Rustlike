@@ -18,7 +18,7 @@ pub use visibility_system::VisibilitySystem;
 
 use components::{LeftMover, Position, Renderable, Player, Viewshed};
 
-use rltk::{GameState, RandomNumberGenerator, Rltk, RGB, Point};
+use rltk::{GameState, RandomNumberGenerator, Rltk, RGB};
 use specs::prelude::*;
 
 //Map
@@ -27,26 +27,30 @@ fn draw_map(ecs: &World, ctx: &mut Rltk) {
     let mut players = ecs.write_storage::<Player>();
     let map = ecs.fetch::<Map>();
 
-    for (_player, viewshed) in (&mut players, &mut viewsheds).join() {
+    for (_player, _viewshed) in (&mut players, &mut viewsheds).join() {
         let mut y = 0;
         let mut x = 0;
 
         for (index, tile) in map.tiles.iter().enumerate() {
             if map.revealed_tiles[index] {
+                let glyph;
+                let mut foreground;
+                
                 match tile {
                     TileType::Floor => {
-                        ctx.set(x, y, RGB::from_f32(0.5, 0.5, 0.5), RGB::from_f32(0., 0., 0.), rltk::to_cp437(' '))
+                        glyph = rltk::to_cp437(' ');
+                        foreground = RGB::from_f32(0.5, 0.5, 0.5);
                     }
 
                     TileType::Wall => {
-                        ctx.set(x, y, RGB::from_f32(0.45, 0.45, 0.35), RGB::from_f32(0., 0., 0.), rltk::to_cp437('#'));
-                    }
-
-                    TileType::Flower => {
-                        ctx.set(x, y, RGB::from_f32(0.8, 0.2, 0.3),
-                                RGB::from_f32(0., 0., 0.), rltk::to_cp437(','));
+                        glyph = rltk::to_cp437('#');
+                        foreground = RGB::from_f32(0.35, 0.35, 0.15);
                     }
                 }
+                
+                if !map.visible_tiles[index] {foreground = foreground.to_greyscale() }
+
+                ctx.set(x, y, foreground, RGB::from_f32(0., 0., 0.), glyph);
             }
 
             x += 1;

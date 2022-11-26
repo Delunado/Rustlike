@@ -25,13 +25,16 @@ impl<'a> System<'a> for VisibilitySystem {
             viewshed.visible_tiles.retain(|p| p.x >= 0 && p.x < map.width && p.y >= 0 && p.y < map.height);
 
             let p: Option<&Player> = player.get(entity);
-            if let Some(p) = p {
+            if let Some(_p) = p {
+                for tile in map.visible_tiles.iter_mut() { *tile = false }
+
                 for vis in viewshed.visible_tiles.iter() {
                     let index = map.get_map_position_index(vis.x, vis.y);
                     map.revealed_tiles[index] = true;
+                    map.visible_tiles[index] = true;
                 }
             }
-            
+
             viewshed.dirty = false;
         }
     }

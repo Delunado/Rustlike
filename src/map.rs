@@ -5,13 +5,13 @@ use super::{Rect};
 #[derive(PartialEq, Copy, Clone)]
 pub enum TileType {
     Wall,
-    Floor,
-    Flower,
+    Floor
 }
 
 pub struct Map {
     pub tiles: Vec<TileType>,
     pub revealed_tiles : Vec<bool>,
+    pub visible_tiles : Vec<bool>,
     pub rooms: Vec<Rect>,
     pub width: i32,
     pub height: i32,
@@ -55,6 +55,7 @@ impl Map {
         let mut map = Map {
             tiles: vec![TileType::Wall; 80 * 50],
             revealed_tiles: vec![false; 80 * 50],
+            visible_tiles: vec![false; 80 * 50],
             rooms: Vec::new(),
             width: 80,
             height: 50,
