@@ -5,13 +5,13 @@ use super::{Rect};
 #[derive(PartialEq, Copy, Clone)]
 pub enum TileType {
     Wall,
-    Floor
+    Floor,
 }
 
 pub struct Map {
     pub tiles: Vec<TileType>,
-    pub revealed_tiles : Vec<bool>,
-    pub visible_tiles : Vec<bool>,
+    pub revealed_tiles: Vec<bool>,
+    pub visible_tiles: Vec<bool>,
     pub rooms: Vec<Rect>,
     pub width: i32,
     pub height: i32,
@@ -20,6 +20,10 @@ pub struct Map {
 impl Map {
     pub fn get_map_position_index(&self, x: i32, y: i32) -> usize {
         (y as usize * self.width as usize) + x as usize
+    }
+
+    pub fn position_is_inside_map(&self, x: i32, y: i32) -> bool {
+        x >= 0 && x < self.width && y >= 0 && y < self.height
     }
 
     fn adjust_room_to_map(&mut self, room: &Rect) {

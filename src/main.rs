@@ -35,7 +35,7 @@ fn draw_map(ecs: &World, ctx: &mut Rltk) {
             if map.revealed_tiles[index] {
                 let glyph;
                 let mut foreground;
-                
+
                 match tile {
                     TileType::Floor => {
                         glyph = rltk::to_cp437(' ');
@@ -47,8 +47,8 @@ fn draw_map(ecs: &World, ctx: &mut Rltk) {
                         foreground = RGB::from_f32(0.35, 0.35, 0.15);
                     }
                 }
-                
-                if !map.visible_tiles[index] {foreground = foreground.to_greyscale() }
+
+                if !map.visible_tiles[index] { foreground = foreground.to_greyscale() }
 
                 ctx.set(x, y, foreground, RGB::from_f32(0., 0., 0.), glyph);
             }
@@ -114,9 +114,16 @@ impl GameState for State {
 
         let positions = self.ecs.read_storage::<Position>();
         let renderables = self.ecs.read_storage::<Renderable>();
+        let map = self.ecs.fetch::<Map>();
 
         for (pos, render) in (&positions, &renderables).join() {
-            ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
+            if map.position_is_inside_map(pos.x, pos.y) {
+                let index = map.get_map_position_index(pos.x, pos.y);
+                
+                if map.visible_tiles[index] {
+                    ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
+                }
+            }
         }
     }
 }
@@ -141,8 +148,6 @@ fn main() -> rltk::BError {
     let map = Map::create_map();
     let (player_x, player_y) = map.rooms[0].center();
 
-    game_state.ecs.insert(map);
-
     game_state
         .ecs
         .create_entity()
@@ -156,9 +161,30 @@ fn main() -> rltk::BError {
         .with(Viewshed {
             visible_tiles: Vec::new(),
             range: 8,
-            dirty : true
+            dirty: true,
         })
         .build();
+
+    for room in map.rooms.iter().skip(1) {
+        let (x, y) = room.center();
+        game_state
+            .ecs
+            .create_entity()
+            .with(Position { x, y })
+            .with(Renderable {
+                glyph: rltk::to_cp437('M'),
+                fg: RGB::named(rltk::INDIANRED2),
+                bg: RGB::named(rltk::BLACK),
+            })
+            .with(Viewshed {
+                visible_tiles: Vec::new(),
+                range: 6,
+                dirty: true,
+            })
+            .build();
+    }
+
+    game_state.ecs.insert(map);
 
     for i in 0..15 {
         game_state
