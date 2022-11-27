@@ -19,10 +19,10 @@ pub use visibility_system::VisibilitySystem;
 use components::{LeftMover, Position, Renderable, Player, Viewshed};
 
 use rltk::{GameState, RandomNumberGenerator, Rltk, RGB};
-use specs::prelude::*;
+use bevy::prelude::*;
 
 //Map
-fn draw_map(ecs: &World, ctx: &mut Rltk) {
+fn draw_map(ecs: &App, ctx: &mut Rltk) {
     let mut viewsheds = ecs.write_storage::<Viewshed>();
     let mut players = ecs.write_storage::<Player>();
     let map = ecs.fetch::<Map>();
@@ -87,18 +87,12 @@ impl<'a> System<'a> for LeftWalker {
 
 // Game State
 pub struct State {
-    ecs: World,
+    ecs: App,
 }
 
 impl State {
-    fn run_systems(&mut self) {
-        let mut lw = LeftWalker {};
-        lw.run_now(&self.ecs);
-
-        let mut vis = VisibilitySystem {};
-        vis.run_now(&self.ecs);
-
-        self.ecs.maintain();
+    fn new() -> Self {
+        Self { ecs: App::new() }
     }
 }
 
@@ -106,31 +100,89 @@ impl GameState for State {
     fn tick(&mut self, ctx: &mut Rltk) {
         ctx.cls();
 
-        self.run_systems();
-
         player_input(self, ctx);
-
+        
         draw_map(&self.ecs, ctx);
 
-        let positions = self.ecs.read_storage::<Position>();
-        let renderables = self.ecs.read_storage::<Renderable>();
-        let map = self.ecs.fetch::<Map>();
+        self.ecs.update();
+    }
+}
 
-        for (pos, render) in (&positions, &renderables).join() {
-            if map.position_is_inside_map(pos.x, pos.y) {
-                let index = map.get_map_position_index(pos.x, pos.y);
-                
-                if map.visible_tiles[index] {
-                    ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
-                }
+// Render world
+fn render_characters(query_characters: Query<(&Position, &Renderable)>, map: ResMut<Map>) {
+    for (pos, render) in query_characters.iter() {
+        if map.position_is_inside_map(pos.x, pos.y) {
+            let index = map.get_map_position_index(pos.x, pos.y);
+
+            if map.visible_tiles[index] {
+                ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
             }
         }
     }
 }
 
+// Startup
+fn init_world(&world: World) {
+    let &map = Map::create_map();
+    let (player_x, player_y) = map.rooms[0].center();
+
+    add_player(player_x, player_y, world);
+    add_monsters(map, world);
+    add_particles(world);
+
+    world.spawn(map);
+}
+
+fn add_player(player_x: i32, player_y: i32, &world: World) {
+    world.spawn((
+        Player {},
+        Position { x: player_x, y: player_y },
+        Renderable {
+            glyph: rltk::to_cp437('☺'),
+            fg: RGB::named(rltk::YELLOW),
+            bg: RGB::named(rltk::BLACK),
+        }, Viewshed {
+            visible_tiles: Vec::new(),
+            range: 8,
+            dirty: true,
+        }));
+}
+
+fn add_monsters(&map: Map, &world: World) {
+    for room in map.rooms.iter().skip(1) {
+        let (x, y) = room.center();
+
+        world.spawn((
+            Position { x, y },
+            Renderable {
+                glyph: rltk::to_cp437('M'),
+                fg: RGB::named(rltk::INDIANRED2),
+                bg: RGB::named(rltk::BLACK),
+            },
+            Viewshed {
+                visible_tiles: Vec::new(),
+                range: 6,
+                dirty: true,
+            }));
+    }
+}
+
+fn add_particles(&world: World) {
+    for i in 0..15 {
+        world.spawn((
+            Position { x: i * 5, y: 70 },
+            Renderable {
+                glyph: rltk::to_cp437('/'),
+                fg: RGB::named(rltk::BLUE),
+                bg: RGB::named(rltk::BLACK),
+            },
+            LeftMover {}
+        ));
+    }
+}
+
 // Main
 fn main() -> rltk::BError {
-    
     use rltk::RltkBuilder;
 
     let context = RltkBuilder::simple80x50()
@@ -138,68 +190,12 @@ fn main() -> rltk::BError {
         .build()?;
 
     // Configuring game state
-    let mut game_state = State { ecs: World::new() };
+    let mut game_state = State::new();
 
-    game_state.ecs.register::<Position>();
-    game_state.ecs.register::<Renderable>();
-    game_state.ecs.register::<LeftMover>();
-    game_state.ecs.register::<Player>();
-    game_state.ecs.register::<Viewshed>();
-
-    let map = Map::create_map();
-    let (player_x, player_y) = map.rooms[0].center();
-
-    game_state
-        .ecs
-        .create_entity()
-        .with(Player {})
-        .with(Position { x: player_x, y: player_y })
-        .with(Renderable {
-            glyph: rltk::to_cp437('☺'),
-            fg: RGB::named(rltk::YELLOW),
-            bg: RGB::named(rltk::BLACK),
-        })
-        .with(Viewshed {
-            visible_tiles: Vec::new(),
-            range: 8,
-            dirty: true,
-        })
-        .build();
-
-    for room in map.rooms.iter().skip(1) {
-        let (x, y) = room.center();
-        game_state
-            .ecs
-            .create_entity()
-            .with(Position { x, y })
-            .with(Renderable {
-                glyph: rltk::to_cp437('M'),
-                fg: RGB::named(rltk::INDIANRED2),
-                bg: RGB::named(rltk::BLACK),
-            })
-            .with(Viewshed {
-                visible_tiles: Vec::new(),
-                range: 6,
-                dirty: true,
-            })
-            .build();
-    }
-
-    game_state.ecs.insert(map);
-
-    for i in 0..15 {
-        game_state
-            .ecs
-            .create_entity()
-            .with(Position { x: i * 5, y: 70 })
-            .with(Renderable {
-                glyph: rltk::to_cp437('/'),
-                fg: RGB::named(rltk::BLUE),
-                bg: RGB::named(rltk::BLACK),
-            })
-            .with(LeftMover {})
-            .build();
-    }
+    game_state.ecs.add_system(render_characters);
+    
+    let &world = game_state.ecs.world;
+    init_world(world);
 
     rltk::main_loop(context, game_state)
 }
