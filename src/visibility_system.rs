@@ -1,25 +1,21 @@
-﻿use bevy::prelude::Query;
-use specs::prelude::*;
+﻿use bevy::prelude::{Query, ResMut};
 use super::{Viewshed, Position, Map, Player};
 use rltk::{field_of_view, Point};
 
 pub struct VisibilitySystem {}
 
-pub fn visibility_system(query: Query<(&mut Map, &mut Viewshed, &Position, &Player)>) {
-    let (mut map, entities, mut viewshed, pos, player) = query;
-    
-    for entity in query.iter() {
+pub fn visibility_system(query: Query<(&mut Viewshed, &Position, Option<&Player>)>, mut map: ResMut<Map>) {
+    for (viewshed, position, player) in query.iter() {
         if !viewshed.dirty {
             return;
         }
 
         viewshed.visible_tiles.clear();
-        viewshed.visible_tiles = field_of_view(Point::new(pos.x, pos.y),
+        viewshed.visible_tiles = field_of_view(Point::new(position.x, position.y),
                                                viewshed.range, &*map);
         viewshed.visible_tiles.retain(|p| p.x >= 0 && p.x < map.width && p.y >= 0 && p.y < map.height);
 
-        let p: Option<&Player> = player.get(entity);
-        if let Some(_p) = p {
+        if let Some(_player) = player {
             for tile in map.visible_tiles.iter_mut() { *tile = false }
 
             for vis in viewshed.visible_tiles.iter() {

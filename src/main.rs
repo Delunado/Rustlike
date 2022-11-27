@@ -16,18 +16,18 @@ mod visibility_system;
 
 pub use visibility_system::VisibilitySystem;
 
-use components::{LeftMover, Position, Renderable, Player, Viewshed};
+mod renderer;
+
+pub use renderer::*;
+
+use components::{Position, Renderable, Player, Viewshed, Particle};
 
 use rltk::{GameState, RandomNumberGenerator, Rltk, RGB};
 use bevy::prelude::*;
 
 //Map
-fn draw_map(ecs: &App, ctx: &mut Rltk) {
-    let mut viewsheds = ecs.write_storage::<Viewshed>();
-    let mut players = ecs.write_storage::<Player>();
-    let map = ecs.fetch::<Map>();
-
-    for (_player, _viewshed) in (&mut players, &mut viewsheds).join() {
+fn render_map(query: Query<(With<Player>, With<Viewshed>)>, map: Res<Map>, mut renderer: ResMut<Renderer>) {
+    for _ in query.iter() {
         let mut y = 0;
         let mut x = 0;
 
@@ -50,36 +50,13 @@ fn draw_map(ecs: &App, ctx: &mut Rltk) {
 
                 if !map.visible_tiles[index] { foreground = foreground.to_greyscale() }
 
-                ctx.set(x, y, foreground, RGB::from_f32(0., 0., 0.), glyph);
+                renderer.render(x, y, foreground, RGB::from_f32(0., 0., 0.), glyph);
             }
 
             x += 1;
             if x > map.width - 1 {
                 x = 0;
                 y += 1;
-            }
-        }
-    }
-}
-
-struct LeftWalker {}
-
-impl<'a> System<'a> for LeftWalker {
-    type SystemData = (ReadStorage<'a, LeftMover>, WriteStorage<'a, Position>);
-
-    fn run(&mut self, (lefty, mut pos): Self::SystemData) {
-        for (_lefty, pos) in (&lefty, &mut pos).join() {
-            let mut random = RandomNumberGenerator::new();
-
-            let y_movement: i32 = random.range(0, 3);
-
-            pos.y += y_movement;
-            pos.x -= 1;
-            if pos.x < 0 {
-                pos.x = 79;
-            }
-            if pos.y > 50 {
-                pos.y = 0;
             }
         }
     }
@@ -100,41 +77,63 @@ impl GameState for State {
     fn tick(&mut self, ctx: &mut Rltk) {
         ctx.cls();
 
-        player_input(self, ctx);
-        
-        draw_map(&self.ecs, ctx);
+        //Convert into a system using an Input resource
+        //player_input(self, ctx);
 
         self.ecs.update();
     }
 }
 
-// Render world
-fn render_characters(query_characters: Query<(&Position, &Renderable)>, map: ResMut<Map>) {
+// Rendering
+fn render_characters(query_characters: Query<(&Position, &Renderable)>, map: Res<Map>, mut renderer: ResMut<Renderer>) {
     for (pos, render) in query_characters.iter() {
         if map.position_is_inside_map(pos.x, pos.y) {
             let index = map.get_map_position_index(pos.x, pos.y);
 
             if map.visible_tiles[index] {
-                ctx.set(pos.x, pos.y, render.fg, render.bg, render.glyph);
+                renderer.render(pos.x, pos.y, render.fg, render.bg, render.glyph);
             }
         }
     }
 }
 
-// Startup
-fn init_world(&world: World) {
-    let &map = Map::create_map();
-    let (player_x, player_y) = map.rooms[0].center();
-
-    add_player(player_x, player_y, world);
-    add_monsters(map, world);
-    add_particles(world);
-
-    world.spawn(map);
+fn render_particles(query_particles: Query<(&Position, &Renderable, With<Particle>)>, map: Res<Map>, mut renderer: ResMut<Renderer>) {
+    for (pos, render, _) in query_particles.iter() {
+        if map.position_is_inside_map(pos.x, pos.y) {
+            renderer.render(pos.x, pos.y, render.fg, render.bg, render.glyph);
+        }
+    }
 }
 
-fn add_player(player_x: i32, player_y: i32, &world: World) {
-    world.spawn((
+// Movement
+fn update_particles(query: Query<(Position, With<Particle>)>) {
+    for (pos, _) in query.iter() {
+        let mut random = RandomNumberGenerator::new();
+
+        let y_movement: i32 = random.range(0, 3);
+
+        pos.y += y_movement;
+        pos.x -= 1;
+        if pos.x < 0 {
+            pos.x = 79;
+        }
+        if pos.y > 50 {
+            pos.y = 0;
+        }
+    }
+}
+
+// Startup
+fn init_world(commands: Commands, map: Res<Map>) {
+    let (player_x, player_y) = map.rooms[0].center();
+
+    add_player(player_x, player_y, commands);
+    add_monsters(&map, commands);
+    add_particles(commands);
+}
+
+fn add_player(player_x: i32, player_y: i32, commands: Commands) {
+    commands.spawn((
         Player {},
         Position { x: player_x, y: player_y },
         Renderable {
@@ -148,11 +147,11 @@ fn add_player(player_x: i32, player_y: i32, &world: World) {
         }));
 }
 
-fn add_monsters(&map: Map, &world: World) {
+fn add_monsters(map: &Map, commands: Commands) {
     for room in map.rooms.iter().skip(1) {
         let (x, y) = room.center();
 
-        world.spawn((
+        commands.spawn((
             Position { x, y },
             Renderable {
                 glyph: rltk::to_cp437('M'),
@@ -167,16 +166,16 @@ fn add_monsters(&map: Map, &world: World) {
     }
 }
 
-fn add_particles(&world: World) {
+fn add_particles(commands: Commands) {
     for i in 0..15 {
-        world.spawn((
+        commands.spawn((
             Position { x: i * 5, y: 70 },
             Renderable {
                 glyph: rltk::to_cp437('/'),
                 fg: RGB::named(rltk::BLUE),
                 bg: RGB::named(rltk::BLACK),
             },
-            LeftMover {}
+            Particle{}
         ));
     }
 }
@@ -192,10 +191,20 @@ fn main() -> rltk::BError {
     // Configuring game state
     let mut game_state = State::new();
 
-    game_state.ecs.add_system(render_characters);
+
+    let map = Map::create_map();
+    game_state.ecs.insert_resource(map);
+
+    let renderer = Renderer { render: context };
+    game_state.ecs.insert_resource(renderer);
     
-    let &world = game_state.ecs.world;
-    init_world(world);
+    game_state.ecs.add_startup_system(init_world);
+    
+    game_state.ecs.add_system(update_particles);
+
+    game_state.ecs.add_system(render_characters);
+    game_state.ecs.add_system(render_map);
+    game_state.ecs.add_system(render_particles);
 
     rltk::main_loop(context, game_state)
 }

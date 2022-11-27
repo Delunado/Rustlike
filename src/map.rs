@@ -1,6 +1,7 @@
 ﻿use rltk::{Algorithm2D, BaseMap, Point, RandomNumberGenerator};
 use std::cmp::{max, min};
 use super::{Rect};
+use bevy::prelude::*;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum TileType {
@@ -8,6 +9,7 @@ pub enum TileType {
     Floor,
 }
 
+#[derive(Resource)]
 pub struct Map {
     pub tiles: Vec<TileType>,
     pub revealed_tiles: Vec<bool>,

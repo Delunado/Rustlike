@@ -1,7 +1,6 @@
 ﻿use rltk::{FontCharType, RGB};
 
-use specs::prelude::*;
-use specs_derive::Component;
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct Position {
@@ -17,7 +16,7 @@ pub struct Renderable {
 }
 
 #[derive(Component)]
-pub struct LeftMover {}
+pub struct Particle {}
 
 #[derive(Component, Debug)]
 pub struct Player {}
@@ -26,5 +25,5 @@ pub struct Player {}
 pub struct Viewshed {
     pub visible_tiles: Vec<rltk::Point>,
     pub range: i32,
-    pub dirty : bool
+    pub dirty: bool,
 }

@@ -4,7 +4,7 @@ use super::{components::{Position, Player}, TileType, State};
 use std::cmp::{min, max};
 use crate::{Map, Viewshed};
 
-pub fn move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
+/*pub fn move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
     let mut positions = ecs.write_storage::<Position>();
     let mut players = ecs.write_storage::<Player>();
     let mut viewsheds = ecs.write_storage::<Viewshed>();
@@ -44,4 +44,4 @@ pub fn player_input(game_state: &mut State, ctx: &mut Rltk) {
             _ => {}
         },
     }
-}
+}*/
