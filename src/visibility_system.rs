@@ -4,8 +4,8 @@ use rltk::{field_of_view, Point};
 
 pub struct VisibilitySystem {}
 
-pub fn visibility_system(query: Query<(&mut Viewshed, &Position, Option<&Player>)>, mut map: ResMut<Map>) {
-    for (viewshed, position, player) in query.iter() {
+pub fn visibility_system(mut query: Query<(&mut Viewshed, &Position, Option<&Player>)>, mut map: ResMut<Map>) {
+    for (mut viewshed, position, player) in query.iter_mut() {
         if !viewshed.dirty {
             return;
         }

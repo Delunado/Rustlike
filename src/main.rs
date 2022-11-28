@@ -106,8 +106,8 @@ fn render_particles(query_particles: Query<(&Position, &Renderable, With<Particl
 }
 
 // Movement
-fn update_particles(query: Query<(Position, With<Particle>)>) {
-    for (pos, _) in query.iter() {
+fn update_particles(mut query: Query<(&mut Position, With<Particle>)>) {
+    for (mut pos, _) in query.iter_mut() {
         let mut random = RandomNumberGenerator::new();
 
         let y_movement: i32 = random.range(0, 3);
@@ -123,16 +123,10 @@ fn update_particles(query: Query<(Position, With<Particle>)>) {
     }
 }
 
-// Startup
-fn init_world(commands: Commands, map: Res<Map>) {
+// Start up
+fn add_player(mut commands: Commands, map: Res<Map>) {
     let (player_x, player_y) = map.rooms[0].center();
 
-    add_player(player_x, player_y, commands);
-    add_monsters(&map, commands);
-    add_particles(commands);
-}
-
-fn add_player(player_x: i32, player_y: i32, commands: Commands) {
     commands.spawn((
         Player {},
         Position { x: player_x, y: player_y },
@@ -147,7 +141,7 @@ fn add_player(player_x: i32, player_y: i32, commands: Commands) {
         }));
 }
 
-fn add_monsters(map: &Map, commands: Commands) {
+fn add_monsters(mut commands: Commands, map: Res<Map>) {
     for room in map.rooms.iter().skip(1) {
         let (x, y) = room.center();
 
@@ -166,7 +160,7 @@ fn add_monsters(map: &Map, commands: Commands) {
     }
 }
 
-fn add_particles(commands: Commands) {
+fn add_particles(mut commands: Commands) {
     for i in 0..15 {
         commands.spawn((
             Position { x: i * 5, y: 70 },
@@ -175,7 +169,7 @@ fn add_particles(commands: Commands) {
                 fg: RGB::named(rltk::BLUE),
                 bg: RGB::named(rltk::BLACK),
             },
-            Particle{}
+            Particle {}
         ));
     }
 }
@@ -190,16 +184,17 @@ fn main() -> rltk::BError {
 
     // Configuring game state
     let mut game_state = State::new();
-
-
+    
     let map = Map::create_map();
     game_state.ecs.insert_resource(map);
 
-    let renderer = Renderer { render: context };
+    let renderer = Renderer::new(&context);
     game_state.ecs.insert_resource(renderer);
-    
-    game_state.ecs.add_startup_system(init_world);
-    
+
+    game_state.ecs.add_startup_system(add_player);
+    game_state.ecs.add_startup_system(add_monsters);
+    game_state.ecs.add_startup_system(add_particles);
+
     game_state.ecs.add_system(update_particles);
 
     game_state.ecs.add_system(render_characters);
